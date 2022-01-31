@@ -1,0 +1,154 @@
+%CP1=[CP3;CP4];
+CP1=CP1(:,1: 4);
+CP1=sortrows(CP1,1);
+dist0=0.09;
+count2=1;
+CP1c=zeros(1,35);
+for i=1:length(CP1)
+    distx=0;
+    count=1;
+    for j=i:-1:1
+         if distx<=dist0 
+            distx=abs(CP1(i,1)-CP1(j,1));
+            disty=abs(CP1(i,2)-CP1(j,2));
+            distz=abs(CP1(i,3)-CP1(j,3));
+            dist=sqrt(distx*distx+disty*disty+distz*distz);
+            if dist<dist0
+                count=count+1;
+                CP1c(i,count)=CP1(j,4);
+            end
+         else                                                                                                                                                                                                                    
+            break
+            
+        end
+    end
+    distx=0;
+    for j=i+1:length(CP1)
+        if distx<=dist0  
+            distx=abs(CP1(i,1)-CP1(j,1));   
+            disty=abs(CP1(i,2)-CP1(j,2));
+            distz=abs(CP1(i,3)-CP1(j,3));
+            dist=sqrt(distx*distx+disty*disty+distz*distz); 
+            if dist<dist0 
+                count=count+1;
+                CP1c(i,count)=CP1(j,4);
+            end
+        else 
+            break
+ end
+    end
+    if CP1c(i,6)~=0
+    CP1c(i,1)=count2;
+   Phexin(count2,1)=CP1c(i,2);
+   count2=count2+1;
+end
+end
+count3=1;
+for i=1:length(CP1c)
+    if CP1c(i,1)~=0
+        Phexinj(count3,:)=CP1c(i,:);
+        count3=count3+1;
+    end
+end
+O=Phexin;
+k=0;
+T=CP1(:,4);
+while ~isempty(O)
+ To=T;
+ cz=ceil(length(O)*rand(1,1));
+ Q=O(cz,:);
+ Q1=Q(:,1);
+ T=setdiff(T,Q1);
+  while ~isempty(Q)
+    q=Q(1,:);
+    q1=q(1,1);
+    Q=setdiff(Q,q);    
+  if any(Phexin==q1)
+    [q2,J]=find(Phexin==q1);
+    Nq=Phexinj(q2,:);
+    Nq(1,1)=0;
+    Nq(1,2)=0;
+    Nq(find(Nq==0))=[];
+    det=intersect(Nq,T);
+    Q=union(det,Q);
+    T=setdiff(T,det);
+  end
+  end
+  Z=setdiff(To,T);   
+     O=setdiff(O,Z);
+  if length(Z)>2
+        k=k+1;
+  eval(['C',num2str(k),'=Z;']);
+  end
+end
+count=1;
+for j=1:(k-1)
+eval(['x=length(C',num2str(j),');']);
+if x>25
+    for i=1:x
+   eval(['t=C',num2str(j),'(i,1);']);
+   [I,J]=find(CP1==t);
+  eval(['CPA',num2str(count),'(i,1)=CP1(I,1);']);
+  eval(['CPA',num2str(count),'(i,2)=CP1(I,2);']);
+  eval(['CPA',num2str(count),'(i,3)=CP1(I,3);']);
+end
+  count=count+1;    
+end
+end
+
+for i=1:(k-1)
+    eval(['B(i,3)=mean(CPA',num2str(i),'(:,1));']);
+    eval(['B(i,4)=mean(CPA',num2str(i),'(:,2));']);
+    eval(['B(i,5)=mean(CPA',num2str(i),'(:,3));']);
+    eval(['B(i,6)=length(CPA',num2str(i),'(:,1));']);
+    Pco1=zeros(1,1);
+        Pco2=zeros(1,1);
+            Pco3=zeros(1,1);
+    eval(['Pco1=CPA',num2str(i),'(:,1);']);
+    eval(['Pco2=CPA',num2str(i),'(:,2);']);
+    eval(['Pco3=CPA',num2str(i),'(:,3);']);
+    PPP = [ones(length(Pco1),1) Pco1 Pco2];
+   [bb,bint,r,rint,stats] = regress(Pco3,PPP,95);% z= bb(1) + bb(2)*x + bb(3)*y 
+   B(i,9)=bb(1)*(-1);
+   AA=bb(2)*(-1);
+   BB=bb(3)*(-1);
+   B(i,10)=AA;
+   B(i,11)=BB;
+   CC=1;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+   if AA>0 && BB>0
+   B(i,1)=atan(AA/BB)/pi*180;
+   B(i,2)=90-atan(CC/(sqrt(AA*AA+BB*BB)))/pi*180;
+elseif AA>0 && BB<0
+    B(i,1)=180+atan(AA/BB)/pi*180;
+   B(i,2)=90-atan(CC/(sqrt(AA*AA+BB*BB)))/pi*180;
+elseif AA<0 && BB<0
+    B(i,1)=180+atan(AA/BB)/pi*180;
+   B(i,2)=90-atan(CC/(sqrt(AA*AA+BB*BB)))/pi*180;
+elseif AA<0 && BB>0
+    B(i,1)=360+atan(AA/BB)/pi*180;
+   B(i,2)=90-atan(CC/(sqrt(AA*AA+BB*BB)))/pi*180;
+end 
+end
+
+for z=1:(k-1)
+L(z,1)=0;
+Lx=zeros(1,1);
+Ly=zeros(1,1);
+Lh=zeros(1,1);
+eval(['tt=length(CPA',num2str(z),'(:,1));']);
+        eval(['Lx=CPA',num2str(z),'(:,1);']);
+        eval(['Ly=CPA',num2str(z),'(:,2);']);
+        eval(['Lh=CPA',num2str(z),'(:,3);']);
+for i=1:tt
+    for j=i:tt
+        x=Lx(i,1)-Lx(j,1);
+          y=Ly(i,1)-Ly(j,1);
+            h=Lh(i,1)-Lh(j,1);
+        Lt(z,1)=sqrt(x*x+y*y+h*h);
+        if Lt(z,1)>L(z,1)
+            L(z,1)=Lt(z,1);
+        end
+    end
+B(z,7)=L(z,1);
+end
+end

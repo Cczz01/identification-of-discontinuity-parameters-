@@ -1,0 +1,49 @@
+DD=220;
+DA=63;
+
+if DD>0 && DD<90
+    DD=DD;
+    B=1;
+end
+
+if DD>90 && DD<180
+    DD=DD-180;
+    B=-1;
+end
+
+if DD>180 && DD<270
+    DD=DD-180;
+    B=-1;
+end
+
+if  DD>270 && DD<360
+    DD=DD-360;
+    B=1;
+end
+  AB=tan(DD*pi/180);
+  CAB=tan((90-DA)*pi/180);
+
+  A=B*AB;
+  C=CAB*sqrt(1+A*A);
+sq=sqrt(A*A+B*B+C*C);
+
+for i=1:length(xp)
+    xp(i,4)=A*xp(i,1)+B*xp(i,2)+C*xp(i,3);
+end
+    xp=sortrows(xp,4);
+    xp1=xp;
+    count=1;
+    count2=1;
+for i=1:length(xp)-1
+    t(i,1)=(-xp(i,4)+xp(i+1,4))/sq;   
+    if t(i,1)<0.06
+       xp(i+1,4)=(xp(i,4)*count2+xp(i+1,4))/(count2+1);
+       count2=count2+1;
+    end
+       if t(i,1)>0.06
+       tt(count,1)=t(i,1);
+       count=count+1;
+       count2=1;
+        end
+end
+mean(tt)

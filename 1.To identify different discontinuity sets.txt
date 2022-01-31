@@ -1,0 +1,520 @@
+%转化点云数据坐标，得最接近点
+a=6378137;
+b=6356752.3142;
+f=298.257223563;
+data=importdata('s-1.txt');   
+L=data(:,1);
+B=data(:,2);
+H=data(:,3);
+C=size(B);  
+row=C(1);
+B0=min(B);
+L0=min(L);
+B1=B-B0;
+L1=L-L0;
+RFS=zeros(row,1);
+R=zeros(row,1);
+RFX=zeros(row,1);
+e2=(a*a-b*b)/(a*a);
+for i=1:row
+ RFS(i)=a*cos(B(i)*pi/180);
+ RFX(i)=sqrt(1-e2*sin(B(i))*sin(B(i)));
+ R(i)=RFS(i)/RFX(i); 
+end
+ for i=1:row
+     X(i)=L1(i)*pi*R(i)/180;
+ end
+for i=1:row
+    M(i)=(a*(1-e2))/(1-e2*sin(B(i))*sin(B(i)));
+    Y(i)=M(i)*(B1(i))*pi/180;
+end
+P=zeros(row,3);
+%坐标转换
+    X=X';
+    Y=Y';
+    H=H';
+
+PZ(:,1)=X;
+ PZ(:,2)=Y;
+ PZ(:,3)=H;
+
+rrz=sortrows(PZ,1);%将点排序、编号
+rr=unique(rrz,'rows');
+P=rr';
+
+rrz=sortrows(PZ,1);%将点排序、编号
+rr=unique(rrz,'rows');
+P=rr';
+X = P(1,:);
+Y = P(2,:);
+Z = P(3,:);
+step=0.08;% 包围盒尺寸，控制精简率的唯一参数
+% std_th = 100;
+tic;
+
+Xmin=min(X);Xmax=max(X);
+Ymin=min(Y);Ymax=max(Y);
+Zmin=min(Z);Zmax=max(Z);
+rr = zeros(size(P));% 预定义
+ite = 0;
+for ix=Xmin:step:Xmax
+    xindex=find((X>=ix&X<(ix+step)));
+    if isempty(xindex)==1
+        continue
+    end
+    Xselect=X(xindex);
+    Yselect=Y(xindex);
+    Zselect=Z(xindex);
+    for iy=Ymin:step:Ymax
+        yindex=find(Yselect>=iy&Yselect<(iy+step));
+        if isempty(yindex)==1
+            continue
+        end
+        Xslt=Xselect(yindex);
+        Yslt=Yselect(yindex);
+        Zslt=Zselect(yindex);
+        for iz=Zmin:step:Zmax
+            zindex=find(Zslt>=iz&Zslt<(iz+step));
+            if isempty(zindex)==1
+                continue
+            end
+            Xsel=Xslt(zindex);
+            Ysel=Yslt(zindex);
+            Zsel=Zslt(zindex);
+            if length(zindex)==1
+                ite = ite + 1;
+                rr(:,ite) = [Xsel;Ysel;Zsel];
+                continue
+            end
+            Distance=sqrt((Xsel-mean(Xsel)).^2+(Ysel-mean(Ysel)).^2+(Zsel-mean(Zsel)).^2);
+            index=find(Distance==min(Distance));
+            index = index(1);
+            ite = ite + 1;
+            rr(:,ite) = [Xsel(index);Ysel(index);Zsel(index)];
+        end
+    end
+end
+rr(:,ite+1:end) = [];% 删除矩阵jingjian中的空位置
+rr=rr';
+rr=sortrows(rr,1);
+for i=1:length(rr)
+rr(i,4)=i;
+end
+b=size(rr,1);
+Disx=zeros(b,1001);
+for i=1:b
+    if i<=501
+        for j=1:1001
+        Disx(i,j)=sqrt((rr(j,1)-rr(i,1))*(rr(j,1)-rr(i,1))+(rr(j,2)-rr(i,2))*(rr(j,2)-rr(i,2))+(rr(j,3)-rr(i,3))*(rr(j,3)-rr(i,3)));
+        end
+    elseif i>501 && i<=b-500
+        z=1;
+        for j=(i-500):(i+500) 
+          Disx(i,z)=sqrt((rr(j,1)-rr(i,1))*(rr(j,1)-rr(i,1))+(rr(j,2)-rr(i,2))*(rr(j,2)-rr(i,2))+(rr(j,3)-rr(i,3))*(rr(j,3)-rr(i,3)));
+          z=z+1;
+        end
+    elseif i>b-500
+        z=1;
+        for j=b-1000:b
+        Disx(i,z)=sqrt((rr(j,1)-rr(i,1))*(rr(j,1)-rr(i,1))+(rr(j,2)-rr(i,2))*(rr(j,2)-rr(i,2))+(rr(j,3)-rr(i,3))*(rr(j,3)-rr(i,3)));
+        z=z+1;
+        end
+    end
+end
+k=20;
+Z_min=zeros(b,k);
+m=zeros(b,k);
+for i=1:b
+Z=Disx(i,:);
+ for j=1:k
+t=find(Z==min(Z));%找到第j个最小值得到它的索引值
+tt=size(t,2);
+if tt==1
+m(i,j)=t;
+Z_min(i,j)=Z(m(i,j));%找到第j个最小值
+Z(m(i,j))=max(Z);%设定为一定比所有元素大的一个值，作为排除方式
+else
+    t=min(t);
+    m(i,j)=t;
+    Z_min(i,j)=Z(m(i,j));%找到第j个最小值
+Z(m(i,j))=max(Z);%设定为一定比所有元素大的一个值，作为排除方式
+end
+ end
+end
+z=1;
+   mm=zeros(b,k);
+   Dismin=mean(Z_min(:,2));
+for i=1:b
+if i>501 && i<=b-500
+         for j=1:k  
+        mm(i,j)=z;
+         end 
+      z=z+1;   
+elseif i>b-500
+    for j=1:k
+        mm(i,j)=b-1001;
+    end
+end
+end
+mmmx=m+mm; 
+%y轴最近20个临点
+rry=sortrows(rr,2);
+for i=1:length(rry)
+rry(i,4)=i;
+end
+b=size(rry,1);
+Disy=zeros(b,1001);
+for i=1:b
+    if i<=501
+        for j=1:1001
+        Disy(i,j)=sqrt((rry(j,1)-rry(i,1))*(rry(j,1)-rry(i,1))+(rry(j,2)-rry(i,2))*(rry(j,2)-rry(i,2))+(rry(j,3)-rry(i,3))*(rry(j,3)-rry(i,3)));
+        end
+    elseif i>501 && i<=b-500
+        zy=1;
+        for j=(i-500):(i+500) 
+          Disy(i,zy)=sqrt((rry(j,1)-rry(i,1))*(rry(j,1)-rry(i,1))+(rry(j,2)-rry(i,2))*(rry(j,2)-rry(i,2))+(rry(j,3)-rry(i,3))*(rry(j,3)-rry(i,3)));
+          zy=zy+1;
+        end
+    elseif i>b-500
+        zy=1;
+        for j=b-1000:b
+        Disy(i,zy)=sqrt((rry(j,1)-rry(i,1))*(rry(j,1)-rry(i,1))+(rry(j,2)-rry(i,2))*(rry(j,2)-rry(i,2))+(rry(j,3)-rry(i,3))*(rry(j,3)-rry(i,3)));
+        zy=zy+1;
+        end
+    end
+end
+%寻找y方向内最近的20个点
+Zy_min=zeros(b,k);
+my=zeros(b,k);
+for i=1:b
+Zy=Disy(i,:);
+ for j=1:k
+t=find(Zy==min(Zy));%找到第j个最小值得到它的索引值
+tt=size(t,2);
+if tt==1
+my(i,j)=t;
+Zy_min(i,j)=Zy(my(i,j));%找到第j个最小值
+Zy(my(i,j))=max(Zy);%设定为一定比所有元素大的一个值，作为排除方式
+else
+    t=min(t);
+    my(i,j)=t;
+    Zy_min(i,j)=Zy(my(i,j));%找到第j个最小值
+Zy(my(i,j))=max(Zy);%设定为一定比所有元素大的一个值，作为排除方式
+end
+ end
+end
+z=1;
+   mmy=zeros(b,k);
+   Dismin=mean(Zy_min(:,2));
+for i=1:b
+if i>501 && i<=b-500
+         for j=1:k  
+        mmy(i,j)=z;
+         end 
+      z=z+1;   
+elseif i>b-500
+    for j=1:k
+        mmy(i,j)=b-1001;
+    end
+end
+end
+mmmy=my+mmy; 
+rry=sortrows(rry,1);
+for i=1:length(rry)
+    rry(i,5)=i;
+end
+rry=sortrows(rry,2);
+for i=1:length(rry)
+   for  j=1:k
+       mmmy(i,j)=rry(mmmy(i,j),5);
+   end
+end
+mmmy=sortrows(mmmy,1);%变为以x轴大小为排序依据
+%z轴最近20个临点
+rrz=sortrows(rr,3);
+for i=1:length(rrz)
+rrz(i,4)=i;
+end
+b=size(rrz,1);
+Disx=zeros(b,1001);
+for i=1:b
+    if i<=501
+        for j=1:1001
+        Disx(i,j)=sqrt((rrz(j,1)-rrz(i,1))*(rrz(j,1)-rrz(i,1))+(rrz(j,2)-rrz(i,2))*(rrz(j,2)-rrz(i,2))+(rrz(j,3)-rrz(i,3))*(rrz(j,3)-rrz(i,3)));
+        end
+    elseif i>501 && i<=b-500
+        zz=1;
+        for j=(i-500):(i+500) 
+          Disx(i,zz)=sqrt((rrz(j,1)-rrz(i,1))*(rrz(j,1)-rrz(i,1))+(rrz(j,2)-rrz(i,2))*(rrz(j,2)-rrz(i,2))+(rrz(j,3)-rrz(i,3))*(rrz(j,3)-rrz(i,3)));
+          zz=zz+1;
+        end
+    elseif i>b-500
+        zz=1;
+        for j=b-1000:b
+        Disx(i,zz)=sqrt((rrz(j,1)-rrz(i,1))*(rrz(j,1)-rrz(i,1))+(rrz(j,2)-rrz(i,2))*(rrz(j,2)-rrz(i,2))+(rrz(j,3)-rrz(i,3))*(rrz(j,3)-rrz(i,3)));
+        zz=zz+1;
+        end
+    end
+end
+%寻找y方向内最近的20个点
+Zz_min=zeros(b,k);
+mz=zeros(b,k);
+for i=1:b
+Zz=Disx(i,:);
+ for j=1:k
+t=find(Zz==min(Zz));%找到第j个最小值得到它的索引值
+tt=size(t,2);
+if tt==1
+mz(i,j)=t;
+Zz_min(i,j)=Zz(mz(i,j));%找到第j个最小值
+Zz(mz(i,j))=max(Zz);%设定为一定比所有元素大的一个值，作为排除方式
+else
+    t=min(t);
+    mz(i,j)=t;
+    Zz_min(i,j)=Zz(mz(i,j));%找到第j个最小值
+Zz(mz(i,j))=max(Zz);%设定为一定比所有元素大的一个值，作为排除方式
+end
+ end
+end
+z=1;
+   mmz=zeros(b,k);
+   Dismin=mean(Zz_min(:,2));
+for i=1:b
+if i>501 && i<=b-500
+         for j=1:k  
+        mmz(i,j)=z;
+         end 
+      z=z+1;   
+elseif i>b-500
+    for j=1:k
+        mmz(i,j)=b-1001;
+    end
+end
+end
+mmmz=mz+mmz; 
+rrz=sortrows(rrz,1);
+for i=1:length(rrz)
+    rrz(i,5)=i;
+end
+rrz=sortrows(rrz,3);
+for i=1:length(rrz)
+   for  j=1:k
+       mmmz(i,j)=rrz(mmmz(i,j),5);
+   end
+end
+mmmz=sortrows(mmmz,1);%变为以x轴大小为排序依据
+%slow
+for i=1:length(mmmx)
+    uxy=zeros(1,1);
+    uxy=union(mmmx(i,:),mmmy(i,:));
+    uxyz=zeros(1,1);
+    uxyz=union(uxy,mmmz(i,:));
+    for t=1:length(uxyz)
+        j=uxyz(1,t);
+        distxy(t,2)=sqrt((rr(j,1)-rr(i,1))*(rr(j,1)-rr(i,1))+(rr(j,2)-rr(i,2))*(rr(j,2)-rr(i,2))+(rr(j,3)-rr(i,3))*(rr(j,3)-rr(i,3)));
+        distxy(t,1)=j;
+    end
+    distxy=sortrows(distxy,2);
+    mmm(i,:)=distxy(1:k,1);
+end
+b1=size(mmm,1);
+AA=zeros(b1,1);
+BB=zeros(b1,1);
+
+   count1=1;   
+   count2=1;
+%求各点的倾向倾角
+for i=1:b1
+for j=1:k
+t=mmm(i,j);
+Pco1(j,1)=rr(t,1);
+Pco2(j,1)=rr(t,2);
+Pco3(j,1)=rr(t,3);
+end
+PPP = [ones(length(Pco1),1) Pco1 Pco2];
+[bb,bint,r,rint,stats] = regress(Pco3,PPP,95);% z= bb(1) + bb(2)*x + bb(3)*y   
+AA(i,1)=bb(2)*(-1);
+BB(i,1)=bb(3)*(-1);
+CC=1;
+DD(i,1)=-bb(1);
+pmfc(i,1)=AA(i,1);%拟合平面方程
+pmfc(i,2)=BB(i,1);
+pmfc(i,3)=CC;
+S(i,:)=stats(1,:);
+if S(i,1)<0.5
+   Bound(count1,:)=rr(i,:);
+   count1=count1+1;
+end
+
+end
+for i=1:length(Bound)
+    c=Bound(i,4);
+    tx=mmm(c,:);
+    boundtt(i,:)=tx;
+    for j=1:k
+         t=boundtt(i,j);
+         CGM(i,j)=(pmfc(c,1)*pmfc(t,1)+pmfc(c,2)*pmfc(t,2)+1)/(norm(pmfc(c,:))*norm(pmfc(t,:)));
+      if CGM(i,j)>1
+        CGM(i,j)=1;
+      end
+    CG(i,j)=acos(CGM(i,j))*180/pi;
+      if CG(i,j)>90
+        CG(i,j)=180-CG(i,j);
+      end
+    end
+end  
+
+CG(:,1)=-2;
+for k=20:-1:4
+count1=1;
+Boundx=zeros(1,4);
+CGt=zeros(1,20);
+AA=zeros(1,1);
+BB=zeros(1,1);
+DD=zeros(1,1);
+for i=1:size(Bound,1)
+    t=max(CG(i,:));
+   [I,J]=find(CG(i,:)==t);
+   boundtt(i,J)=0;
+   CG(i,J)=-1;
+   Pco1=zeros(k-1,1);
+   Pco2=zeros(k-1,1);
+   Pco3=zeros(k-1,1);
+   count=0;
+for j=1:20
+    ct=boundtt(i,j);
+    if ct>0
+        count=count+1;
+        Pco1(count,1)=rr(ct,1);
+        Pco2(count,1)=rr(ct,2);
+        Pco3(count,1)=rr(ct,3);
+    end
+end
+    PPP = [ones(length(Pco1),1) Pco1 Pco2];
+    [bb,bint,r,rint,stats] = regress(Pco3,PPP,95);% z= bb(1) + bb(2)*x + bb(3)*y   
+    AA(i,1)=bb(2)*(-1);
+    BB(i,1)=bb(3)*(-1);
+    CC=1;
+    DD(i,1)=-bb(1);
+    ib=boundtt(i,1);
+    pmfc(ib,1)=AA(i,1);%拟合平面方程
+    pmfc(ib,2)=BB(i,1);
+    pmfc(ib,3)=CC;
+    S(i,:)=stats(1,:);
+    if S(i,1)<0.5
+           Boundx(count1,:)=rr(ib,:);
+           count1=count1+1;
+    end
+end
+Boundttx=zeros(1,20);
+if size(Boundx,1)>1
+for i=1:size(Boundx,1)
+    t=Boundx(i,4);
+    [I,J]=find(boundtt(:,1)==t);
+     tx=boundtt(I,:);
+     txc=CG(I,:);
+     Boundttx(i,:)=tx;
+     CGt(i,:)=txc;
+end
+Bound=zeros(1,4);
+Bound=Boundx;
+boundtt=zeros(1,20);
+boundtt=Boundttx;
+CG=zeros(1,20);
+CG=CGt;
+end
+end
+
+Axu=setdiff(rr(:,4),Bound(:,4));
+for i=1:length(Axu)
+    t=Axu(i,1);
+    A(i,:)=rr(t,:);
+end
+for i=1:length(A)
+    t=A(i,4);
+    A(i,5)=pmfc(t,1);
+    A(i,6)=pmfc(t,2);
+    A(i,7)=1;
+    A(i,8)=pmfc(t,3);
+end
+     A(:,9)=0;
+for i=1:length(A)
+    for j=1:length(A)
+     COS9(j,1)=(A(i,5)*A(j,5)+A(i,6)*A(j,6)+1*1)/(sqrt(A(i,5)*A(i,5)+A(i,6)*A(i,6)+1)*sqrt(A(j,5)*A(j,5)+A(j,6)*A(j,6)+1));
+    end
+      for t=1:length(COS9)
+          if COS9(t,1)>0.99
+          A(i,9)=A(i,9)+1;
+          end
+      end
+      COS9=zeros(length(A),1);
+end
+%bufen2zu?
+for i=1:length(A)
+ A(i,10)=-1;
+     for j=1:length(A) 
+        if A(j,9)>A(i,9)
+        COS10=(A(i,5)*A(j,5)+A(i,6)*A(j,6)+1*1)/(sqrt(A(i,5)*A(i,5)+A(i,6)*A(i,6)+1)*sqrt(A(j,5)*A(j,5)+A(j,6)*A(j,6)+1));
+            if COS10>A(i,10)
+            A(i,10)=COS10;
+             end
+        end
+     end
+     A(i,10)=acos(A(i,10))/pi*180;
+end
+%   A11为两者相乘，分类依据
+for i=1:length(A)
+    A(i,11)=A(i,9)*A(i,10);
+end
+ A=sortrows(A,-11);
+ % 求出聚类中心
+ for i=1:1000
+   SP(i,:)=A(i,:);
+end
+for i=1:1000
+    for j=1:1000
+     z1(j,1)=abs(SP(i,5)*SP(j,5)+SP(i,6)*SP(j,6)+1*1)/(sqrt(SP(i,5)*SP(i,5)+SP(i,6)*SP(i,6)+1)*sqrt(SP(j,5)*SP(j,5)+SP(j,6)*SP(j,6)+1));
+    if i~=j && z1(j,1)>0.68
+     SP(j,:)=0;
+    end
+    end
+end
+SP(all(SP==0,2),:)=[];
+
+for i=1:length(A)
+    for j=1:size(SP,1)
+        CP(i,j)=abs(A(i,5)*SP(j,5)+A(i,6)*SP(j,6)+1*1)/(sqrt(A(i,5)*A(i,5)+A(i,6)*A(i,6)+1)*sqrt(SP(j,5)*SP(j,5)+SP(j,6)*SP(j,6)+1));
+end
+end
+for j=1:size(SP,1)
+  eval(['count',num2str(j),'=1;']); 
+end
+count5=1;
+for i=1:size(SP,1)
+   if SP(i,5)>0 && SP(i,6)>0
+   HX(i,1)=atan(SP(i,5)/SP(i,6))/pi*180;
+   HX(i,2)=90-atan(SP(i,7)/(sqrt(SP(i,5)*SP(i,5)+SP(i,6)*SP(i,6))))/pi*180;
+elseif SP(i,5)>0 && SP(i,6)<0
+    HX(i,1)=180+atan(SP(i,5)/SP(i,6))/pi*180;
+   HX(i,2)=90-atan(SP(i,7)/(sqrt(SP(i,5)*SP(i,5)+SP(i,6)*SP(i,6))))/pi*180;
+elseif SP(i,5)<0 && SP(i,6)<0
+    HX(i,1)=180+atan(SP(i,5)/SP(i,6))/pi*180;
+   HX(i,2)=90-atan(SP(i,7)/(sqrt(SP(i,5)*SP(i,5)+SP(i,6)*SP(i,6))))/pi*180;
+elseif SP(i,5)<0 &&  SP(i,6)>0
+    HX(i,1)=360+atan(SP(i,5)/SP(i,6))/pi*180;
+   HX(i,2)=90-atan(SP(i,7)/(sqrt(SP(i,5)*SP(i,5)+SP(i,6)*SP(i,6))))/pi*180;
+end 
+end
+C=1;
+for i=1:length(A)
+    Max=max(CP(i,:));
+    [I,J]=find(CP(i,:)==Max);
+    if Max>0.78
+    eval(['CP',num2str(J),'(count',num2str(J),',:)=A(i,:);']); 
+    eval(['count',num2str(J),'=count',num2str(J),'+1;']); 
+    end
+    if  Max<0.8
+        B(C,:)=A(i,:);
+        C=C+1;
+    end
+end
